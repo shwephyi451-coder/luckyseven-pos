@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LuckySeven POS</title>
+  <style>
+    * { box-sizing: border-box; font-family: Arial, sans-serif; }
+    body { margin: 0; background: #f4f6f8; color: #1f2937; }
+    header { background: #166534; color: #fff; padding: 14px 16px; font-size: 18px; font-weight: bold; }
+    .container { max-width: 680px; margin: 16px auto; padding: 0 14px 40px; }
+    .card { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+    h3 { margin: 0 0 10px; font-size: 16px; color: #166534; }
+    input, button { width: 100%; padding: 10px; margin-top: 8px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 15px; }
+    button { background: #166534; color: #fff; border: none; font-weight: bold; cursor: pointer; }
+    button.secondary { background: #1d4ed8; }
+    .row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #e5e7eb; }
+    .row:last-child { border-bottom: none; }
+    .total { font-size: 18px; font-weight: bold; color: #166534; text-align: right; margin-top: 10px; }
+    .small { font-size: 13px; color: #64748b; }
+  </style>
+</head>
+<body>
+  <header>LuckySeven POS</header>
+  <div class="container">
+    <div class="card">
+      <h3>ပစ္စည်းအသစ် ထည့်ရန် (Stock)</h3>
+      <input id="itemName" type="text" placeholder="ပစ္စည်းအမည် (ဥပမာ - Capacitor 45uF)" />
+      <input id="itemPrice" type="number" placeholder="ရောင်းဈေး (ကျပ်)" />
+      <input id="itemQty" type="number" placeholder="အရေအတွက်" />
+      <button onclick="addItem()">Stock ထဲ ထည့်မည်</button>
+    </div>
+
+    <div class="card">
+      <h3>ပစ္စည်းစာရင်း (နှိပ်ပြီး ရောင်းချပါ)</h3>
+      <div id="stockList" class="small">ပစ္စည်းစာရင်း ထည့်သွင်းပါ...</div>
+    </div>
+
+    <div class="card">
+      <h3>လက်ရှိ ဘေလ်စာရင်း (Cart)</h3>
+      <div id="cartList" class="small">ရွေးချယ်ထားသော ပစ္စည်း မရှိသေးပါ</div>
+      <div class="total">စုစုပေါင်း: <span id="cartTotal">0</span> ကျပ်</div>
+      <button class="secondary" onclick="checkout()">အရောင်း အတည်ပြုမည်</button>
+    </div>
+
+    <div class="card">
+      <h3>ယနေ့ စုစုပေါင်း ရောင်းရငွေ</h3>
+      <div class="total"><span id="todaySales">0</span> ကျပ်</div>
+    </div>
+  </div>
+
+  <script>
+    let items = JSON.parse(localStorage.getItem("ls_items") || "[]");
+    let cart = [];
+    let todaySales = Number(localStorage.getItem("ls_sales") || "0");
+
+    function saveLocal() {
+      localStorage.setItem("ls_items", JSON.stringify(items));
+      localStorage.setItem("ls_sales", String(todaySales));
+    }
+
+    function addItem() {
+      const name = document.getElementById("itemName").value.trim();
+      const price = Number(document.getElementById("itemPrice").value);
+      const qty = Number(document.getElementById("itemQty").value);
+      if (!name || price <= 0 || qty <= 0) {
+        alert("ပစ္စည်းအမည်၊ ဈေးနှုန်းနှင့် အရေအတွက် မှန်ကန်စွာ ထည့်ပါ။");
+        return;
+      }
+      items.push({ id: Date.now(), name, price, qty });
+      document.getElementById("itemName").value = "";
+      document.getElementById("itemPrice").value = "";
+      document.getElementById("itemQty").value = "";
+      saveLocal();
+      render();
+    }
+
+    function addToCart(id) {
+      const item = items.find(x => x.id === id);
+      if (!item || item.qty <= 0) {
+        alert("လက်ကျန် မရှိတော့ပါ။");
+        return;
+      }
+      const existing = cart.find(x => x.id === id);
+      if (existing) {
+        if (existing.count >= item.qty) {
+          alert("လက်ကျန်ထက် ကျော်လွန်နေပါသည်။");
+          return;
+        }
+        existing.count += 1;
+      } else {
+        cart.push({ id: item.id, name: item.name, price: item.price, count: 1 });
+      }
+      render();
+    }
+
+    function checkout() {
+      if (cart.length === 0) {
+        alert("ရောင်းချမည့် ပစ္စည်း ရွေးပါ။");
+        return;
+      }
+      let billTotal = 0;
+      cart.forEach(c => {
+        const item = items.find(x => x.id === c.id);
+        if (item) item.qty -= c.count;
+        billTotal += c.price * c.count;
+      });
+      todaySales += billTotal;
+      cart = [];
+      saveLocal();
+      render();
+      alert("အရောင်း ပြီးစီးပါပြီ။ ကျသင့်ငွေ: " + billTotal.toLocaleString() + " ကျပ်");
+    }
+
+    function render() {
+      const stockEl = document.getElementById("stockList");
+      if (items.length === 0) {
+        stockEl.innerHTML = '<div class="small">ပစ္စည်းစာရင်း ထည့်သွင်းပါ...</div>';
+      } else {
+        stockEl.innerHTML = items.map(i => `
+          <div class="row">
+            <div>
+              <strong>${i.name}</strong><br/>
+              <span class="small">${i.price.toLocaleString()} ကျပ် | လက်ကျန်: ${i.qty}</span>
+            </div>
+            <button style="width:auto;margin:0;padding:8px 14px;" onclick="addToCart(${i.id})">+ ထည့်</button>
+          </div>
+        `).join("");
+      }
+
+      const cartEl = document.getElementById("cartList");
+      let total = 0;
+      if (cart.length === 0) {
+        cartEl.innerHTML = '<div class="small">ရွေးချယ်ထားသော ပစ္စည်း မရှိသေးပါ</div>';
+      } else {
+        cartEl.innerHTML = cart.map(c => {
+          const sub = c.price * c.count;
+          total += sub;
+          return `<div class="row"><span>${c.name} × ${c.count}</span><strong>${sub.toLocaleString()} ကျပ်</strong></div>`;
+        }).join("");
+      }
+      document.getElementById("cartTotal").innerText = total.toLocaleString();
+      document.getElementById("todaySales").innerText = todaySales.toLocaleString();
+    }
+
+    render();
+  </script>
+</body>
+</html>
